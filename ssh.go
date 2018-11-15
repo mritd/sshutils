@@ -40,7 +40,29 @@ type sshSession struct {
 }
 
 func (s *sshSession) Close() error {
-	return s.Session.Close()
+
+	var err error
+	pw, ok := s.Session.Stdout.(*io.PipeWriter)
+	if ok {
+		err = pw.Close()
+		if err != nil {
+			return err
+		}
+	}
+
+	pr, ok := s.Session.Stdin.(*io.PipeReader)
+	if ok {
+		err = pr.Close()
+		if err != nil {
+			return err
+		}
+	}
+
+	err = s.Session.Close()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *sshSession) updateTerminalSize() {
