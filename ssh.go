@@ -30,13 +30,14 @@ import (
 )
 
 type sshSession struct {
-	Session  *ssh.Session
-	ErrCh    chan error
-	ReadDone chan int
-	exitMsg  string
-	Stdout   io.Reader
-	Stdin    io.Writer
-	Stderr   io.Reader
+	Session *ssh.Session
+	ErrCh   chan error
+	ReadyCh chan int
+	DoneCh  chan int
+	exitMsg string
+	Stdout  io.Reader
+	Stdin   io.Writer
+	Stderr  io.Reader
 }
 
 func (s *sshSession) Close() error {
@@ -185,6 +186,11 @@ func (s *sshSession) Terminal() error {
 }
 
 func (s *sshSession) PipeExec(cmd string) {
+
+	defer func() {
+		s.DoneCh <- 1
+	}()
+
 	fd := int(os.Stdin.Fd())
 	termWidth, termHeight, err := terminal.GetSize(fd)
 	if err != nil {
@@ -210,7 +216,7 @@ func (s *sshSession) PipeExec(cmd string) {
 	s.Stdout = pr
 	s.Stderr = pr
 
-	s.ReadDone <- 1
+	s.ReadyCh <- 1
 
 	defer func() {
 		pw.Close()
@@ -218,14 +224,15 @@ func (s *sshSession) PipeExec(cmd string) {
 	err = s.Session.Run(cmd)
 	if err != nil {
 		s.ErrCh <- err
-		return
 	}
+
 }
 
 func New(session *ssh.Session) *sshSession {
 	return &sshSession{
-		Session:  session,
-		ErrCh:    make(chan error),
-		ReadDone: make(chan int),
+		Session: session,
+		ErrCh:   make(chan error),
+		ReadyCh: make(chan int),
+		DoneCh:  make(chan int),
 	}
 }

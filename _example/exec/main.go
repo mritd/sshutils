@@ -66,14 +66,35 @@ func main() {
 	}
 
 	s := sshutils.New(session)
-	go s.PipeExec("journalctl -fu docker")
-	<-s.ReadDone
-	go io.Copy(os.Stdout, s.Stdout)
 
-	switch <-cancelChannel {
-	case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
-		fmt.Println("exit")
-		s.Close()
+	// exec
+	go s.PipeExec("journalctl -fu docker")
+
+	// print error
+	go func() {
+		select {
+		case err := <-s.ErrCh:
+			fmt.Println(err)
+		}
+	}()
+
+	// std copy
+	go func() {
+		select {
+		case <-s.ReadyCh:
+			io.Copy(os.Stdout, s.Stdout)
+		}
+	}()
+
+	select {
+	case <-s.DoneCh:
+		fmt.Println("done")
+	case sig := <-cancelChannel:
+		switch sig {
+		case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
+			fmt.Println("exit")
+			s.Close()
+		}
 	}
 
 }
