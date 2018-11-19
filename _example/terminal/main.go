@@ -57,7 +57,7 @@ func main() {
 		panic(err)
 	}
 
-	err = sshutils.New(session).Terminal()
+	err = sshutils.NewSSHSession(session).Terminal()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

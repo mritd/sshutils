@@ -65,7 +65,7 @@ func main() {
 		panic(err)
 	}
 
-	s := sshutils.New(session)
+	s := sshutils.NewSSHSession(session)
 
 	// exec
 	go s.PipeExec("journalctl -fu docker")
