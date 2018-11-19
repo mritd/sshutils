@@ -31,13 +31,25 @@ import (
 
 type sshSession struct {
 	Session *ssh.Session
-	ErrCh   chan error
-	ReadyCh chan int
-	DoneCh  chan int
+	errCh   chan error
+	readyCh chan int
+	doneCh  chan int
 	exitMsg string
 	Stdout  io.Reader
 	Stdin   io.Writer
 	Stderr  io.Reader
+}
+
+func (s *sshSession) Error() <- chan error{
+	return s.errCh
+}
+
+func (s *sshSession) Ready() <- chan int{
+	return s.readyCh
+}
+
+func (s *sshSession) Done() <- chan int{
+	return s.doneCh
 }
 
 func (s *sshSession) Close() error {
@@ -188,14 +200,14 @@ func (s *sshSession) Terminal() error {
 func (s *sshSession) PipeExec(cmd string) {
 
 	defer func() {
-		s.DoneCh <- 1
-		close(s.ErrCh)
+		s.doneCh <- 1
+		close(s.errCh)
 	}()
 
 	fd := int(os.Stdin.Fd())
 	termWidth, termHeight, err := terminal.GetSize(fd)
 	if err != nil {
-		s.ErrCh <- err
+		s.errCh <- err
 		return
 	}
 
@@ -206,7 +218,7 @@ func (s *sshSession) PipeExec(cmd string) {
 
 	err = s.Session.RequestPty(termType, termHeight, termWidth, ssh.TerminalModes{})
 	if err != nil {
-		s.ErrCh <- err
+		s.errCh <- err
 		return
 	}
 
@@ -217,14 +229,14 @@ func (s *sshSession) PipeExec(cmd string) {
 	s.Stdout = pr
 	s.Stderr = pr
 
-	s.ReadyCh <- 1
+	s.readyCh <- 1
 
 	defer func() {
 		pw.Close()
 	}()
 	err = s.Session.Run(cmd)
 	if err != nil {
-		s.ErrCh <- err
+		s.errCh <- err
 	}
 
 }
@@ -232,8 +244,8 @@ func (s *sshSession) PipeExec(cmd string) {
 func New(session *ssh.Session) *sshSession {
 	return &sshSession{
 		Session: session,
-		ErrCh:   make(chan error),
-		ReadyCh: make(chan int),
-		DoneCh:  make(chan int),
+		errCh:   make(chan error),
+		readyCh: make(chan int),
+		doneCh:  make(chan int),
 	}
 }

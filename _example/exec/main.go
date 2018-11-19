@@ -73,7 +73,7 @@ func main() {
 	// print error
 	go func() {
 		select {
-		case err := <-s.ErrCh:
+		case err := <-s.Error():
 			fmt.Println(err)
 		}
 	}()
@@ -81,13 +81,13 @@ func main() {
 	// std copy
 	go func() {
 		select {
-		case <-s.ReadyCh:
+		case <-s.Ready():
 			io.Copy(os.Stdout, s.Stdout)
 		}
 	}()
 
 	select {
-	case <-s.DoneCh:
+	case <-s.Done():
 		fmt.Println("done")
 	case sig := <-cancelChannel:
 		switch sig {
