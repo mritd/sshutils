@@ -189,6 +189,7 @@ func (s *sshSession) PipeExec(cmd string) {
 
 	defer func() {
 		s.DoneCh <- 1
+		close(s.ErrCh)
 	}()
 
 	fd := int(os.Stdin.Fd())
