@@ -30,7 +30,7 @@ import (
 )
 
 type sshSession struct {
-	Session *ssh.Session
+	session *ssh.Session
 	errCh   chan error
 	readyCh chan int
 	doneCh  chan int
@@ -40,22 +40,22 @@ type sshSession struct {
 	Stderr  io.Reader
 }
 
-func (s *sshSession) Error() <- chan error{
+func (s *sshSession) Error() <-chan error {
 	return s.errCh
 }
 
-func (s *sshSession) Ready() <- chan int{
+func (s *sshSession) Ready() <-chan int {
 	return s.readyCh
 }
 
-func (s *sshSession) Done() <- chan int{
+func (s *sshSession) Done() <-chan int {
 	return s.doneCh
 }
 
 func (s *sshSession) Close() error {
 
 	var err error
-	pw, ok := s.Session.Stdout.(*io.PipeWriter)
+	pw, ok := s.session.Stdout.(*io.PipeWriter)
 	if ok {
 		err = pw.Close()
 		if err != nil {
@@ -63,7 +63,7 @@ func (s *sshSession) Close() error {
 		}
 	}
 
-	pr, ok := s.Session.Stdin.(*io.PipeReader)
+	pr, ok := s.session.Stdin.(*io.PipeReader)
 	if ok {
 		err = pr.Close()
 		if err != nil {
@@ -71,7 +71,7 @@ func (s *sshSession) Close() error {
 		}
 	}
 
-	err = s.Session.Close()
+	err = s.session.Close()
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func (s *sshSession) updateTerminalSize() {
 					continue
 				}
 
-				s.Session.WindowChange(currTermHeight, currTermWidth)
+				s.session.WindowChange(currTermHeight, currTermWidth)
 				if err != nil {
 					fmt.Printf("Unable to send window-change reqest: %s.", err)
 					continue
@@ -148,22 +148,22 @@ func (s *sshSession) Terminal() error {
 		termType = "xterm-256color"
 	}
 
-	err = s.Session.RequestPty(termType, termHeight, termWidth, ssh.TerminalModes{})
+	err = s.session.RequestPty(termType, termHeight, termWidth, ssh.TerminalModes{})
 	if err != nil {
 		return err
 	}
 
 	s.updateTerminalSize()
 
-	s.Stdin, err = s.Session.StdinPipe()
+	s.Stdin, err = s.session.StdinPipe()
 	if err != nil {
 		return err
 	}
-	s.Stdout, err = s.Session.StdoutPipe()
+	s.Stdout, err = s.session.StdoutPipe()
 	if err != nil {
 		return err
 	}
-	s.Stderr, err = s.Session.StderrPipe()
+	s.Stderr, err = s.session.StderrPipe()
 
 	go io.Copy(os.Stderr, s.Stderr)
 	go io.Copy(os.Stdout, s.Stdout)
@@ -186,11 +186,11 @@ func (s *sshSession) Terminal() error {
 		}
 	}()
 
-	err = s.Session.Shell()
+	err = s.session.Shell()
 	if err != nil {
 		return err
 	}
-	err = s.Session.Wait()
+	err = s.session.Wait()
 	if err != nil {
 		return err
 	}
@@ -216,7 +216,7 @@ func (s *sshSession) PipeExec(cmd string) {
 		termType = "xterm-256color"
 	}
 
-	err = s.Session.RequestPty(termType, termHeight, termWidth, ssh.TerminalModes{})
+	err = s.session.RequestPty(termType, termHeight, termWidth, ssh.TerminalModes{})
 	if err != nil {
 		s.errCh <- err
 		return
@@ -224,8 +224,8 @@ func (s *sshSession) PipeExec(cmd string) {
 
 	// write to pw
 	pr, pw := io.Pipe()
-	s.Session.Stdout = pw
-	s.Session.Stderr = pw
+	s.session.Stdout = pw
+	s.session.Stderr = pw
 	s.Stdout = pr
 	s.Stderr = pr
 
@@ -234,16 +234,16 @@ func (s *sshSession) PipeExec(cmd string) {
 	defer func() {
 		pw.Close()
 	}()
-	err = s.Session.Run(cmd)
+	err = s.session.Run(cmd)
 	if err != nil {
 		s.errCh <- err
 	}
 
 }
 
-func New(session *ssh.Session) *sshSession {
+func NewSSHSession(session *ssh.Session) *sshSession {
 	return &sshSession{
-		Session: session,
+		session: session,
 		errCh:   make(chan error),
 		readyCh: make(chan int),
 		doneCh:  make(chan int),
