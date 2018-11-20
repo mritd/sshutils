@@ -226,10 +226,22 @@ func (s *scpClient) CopyLocalDir2Remote(localDirPath, remotePath string) error {
 
 func (s *scpClient) CopyLocal2Remote(paths ...string) error {
 
-	// TODO
-	// the remote path must exist when paths contains local files and directories
+	if len(paths) < 2 {
+		return errors.New("parameter invalid")
+	}
+
 	remotePath := paths[len(paths)-1]
 	remotePath = s.replaceHome(remotePath, false)
+
+	if len(paths) > 2 {
+		remoteFileInfo, err := s.sftpClient.Stat(remotePath)
+		if err != nil {
+			return err
+		}
+		if !remoteFileInfo.IsDir() {
+			return errors.New("remote path must a directory")
+		}
+	}
 
 	for _, localPath := range paths {
 		if localPath == paths[len(paths)-1] {
@@ -253,7 +265,7 @@ func (s *scpClient) CopyLocal2Remote(paths ...string) error {
 
 }
 
-func (s *scpClient) CopyRemote2Local(localPath, remotePath string) error {
+func (s *scpClient) CopyRemote2Local(remotePath, localPath string) error {
 
 	localPath = s.replaceHome(localPath, true)
 	remotePath = s.replaceHome(remotePath, false)
@@ -279,8 +291,8 @@ func (s *scpClient) CopyRemote2Local(localPath, remotePath string) error {
 		// if local dir not exist, we will create a local dir
 		// with the same name as the remote dir
 		if localFileErr != nil {
-			if localFileErr == os.ErrNotExist {
-				err = os.Mkdir(path.Join(localPath), remoteFileInfo.Mode())
+			if os.IsNotExist(localFileErr) {
+				err = os.MkdirAll(path.Join(localPath), remoteFileInfo.Mode())
 				if err != nil {
 					return err
 				}
@@ -290,7 +302,7 @@ func (s *scpClient) CopyRemote2Local(localPath, remotePath string) error {
 			if localFileInfo.IsDir() {
 				// create local dir
 				localPath = path.Join(localPath, path.Base(remotePath))
-				err = os.Mkdir(localPath, remoteFileInfo.Mode())
+				err = os.MkdirAll(localPath, remoteFileInfo.Mode())
 				if err != nil {
 					return err
 				}
@@ -337,7 +349,7 @@ func (s *scpClient) CopyRemote2Local(localPath, remotePath string) error {
 		if localFileErr != nil {
 			// if remote path is a file and local file not exist, we will create a local
 			// file with the same name as the remote file
-			if localFileErr == os.ErrNotExist {
+			if os.IsNotExist(localFileErr) {
 				localFile, err := os.OpenFile(localPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, remoteFileInfo.Mode())
 				if err != nil {
 					return err

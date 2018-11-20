@@ -46,7 +46,7 @@ func main() {
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	client, err := ssh.Dial("tcp", "192.168.1.61:22", sshConfig)
+	client, err := ssh.Dial("tcp", "10.211.55.11:22", sshConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -55,7 +55,32 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	err = scp.CopyLocal2Remote("~/tmp/client.json", "~/.ssh/id_rsa.pub", "~")
+	err = scp.CopyLocal2Remote("~/tmp/docker.service", "~/.ssh/id_rsa.pub", "~")
+	if err != nil {
+		panic(err)
+	}
+
+	err = scp.CopyLocal2Remote("~/tmp/CEFI/EFI/BOOT/BOOTX64.efi", "~/tmp/EFI", "~")
+	if err != nil {
+		panic(err)
+	}
+
+	err = scp.CopyRemote2Local("~/EFI", "~/tmp/mcptest")
+	if err != nil {
+		panic(err)
+	}
+
+	err = scp.CopyRemote2Local("~/EFI", "~/tmp/mcptest")
+	if err != nil {
+		panic(err)
+	}
+
+	err = scp.CopyRemote2Local("~/BOOTX64.efi", "~/tmp")
+	if err != nil {
+		panic(err)
+	}
+
+	err = scp.CopyRemote2Local("~/BOOTX64.efi", "~/tmp/aaaa")
 	if err != nil {
 		panic(err)
 	}
