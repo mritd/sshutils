@@ -107,7 +107,7 @@ func (s *sshSession) updateTerminalSize() {
 					continue
 				}
 
-				s.session.WindowChange(currTermHeight, currTermWidth)
+				_ = s.session.WindowChange(currTermHeight, currTermWidth)
 				if err != nil {
 					fmt.Printf("Unable to send window-change reqest: %s.", err)
 					continue
@@ -125,9 +125,9 @@ func (s *sshSession) Terminal() error {
 
 	defer func() {
 		if s.exitMsg == "" {
-			fmt.Fprintln(os.Stdout, "the connection was closed on the remote side on ", time.Now().Format(time.RFC822))
+			_, _ = fmt.Fprintln(os.Stdout, "the connection was closed on the remote side on ", time.Now().Format(time.RFC822))
 		} else {
-			fmt.Fprintln(os.Stdout, s.exitMsg)
+			_, _ = fmt.Fprintln(os.Stdout, s.exitMsg)
 		}
 	}()
 
@@ -136,7 +136,9 @@ func (s *sshSession) Terminal() error {
 	if err != nil {
 		return err
 	}
-	defer terminal.Restore(fd, state)
+	defer func() {
+		_ = terminal.Restore(fd, state)
+	}()
 
 	termWidth, termHeight, err := terminal.GetSize(fd)
 	if err != nil {
@@ -165,8 +167,12 @@ func (s *sshSession) Terminal() error {
 	}
 	s.Stderr, err = s.session.StderrPipe()
 
-	go io.Copy(os.Stderr, s.Stderr)
-	go io.Copy(os.Stdout, s.Stdout)
+	go func() {
+		_, _ = io.Copy(os.Stderr, s.Stderr)
+	}()
+	go func() {
+		_, _ = io.Copy(os.Stdout, s.Stdout)
+	}()
 	go func() {
 		buf := make([]byte, 128)
 		for {
@@ -232,7 +238,7 @@ func (s *sshSession) PipeExec(cmd string) {
 	s.readyCh <- 1
 
 	defer func() {
-		pw.Close()
+		_ = pw.Close()
 	}()
 	err = s.session.Run(cmd)
 	if err != nil {

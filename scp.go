@@ -43,7 +43,9 @@ func (s *scpClient) CopyLocalFile2Remote(localFilePath, remotePath string) error
 	if err != nil {
 		return err
 	}
-	defer localFile.Close()
+	defer func() {
+		_ = localFile.Close()
+	}()
 
 	localFileInfo, err := localFile.Stat()
 	if err != nil {
@@ -76,7 +78,9 @@ func (s *scpClient) CopyLocalFile2Remote(localFilePath, remotePath string) error
 	if err != nil {
 		return err
 	}
-	defer remoteFile.Close()
+	defer func() {
+		_ = remoteFile.Close()
+	}()
 
 	// copy local file to remote
 	_, err = io.Copy(remoteFile, localFile)
@@ -102,7 +106,9 @@ func (s *scpClient) CopyLocalDir2Remote(localDirPath, remotePath string) error {
 	if err != nil {
 		return err
 	}
-	defer localDir.Close()
+	defer func() {
+		_ = localDir.Close()
+	}()
 
 	localDirInfo, err := localDir.Stat()
 	if err != nil {
@@ -195,7 +201,9 @@ func (s *scpClient) CopyLocalDir2Remote(localDirPath, remotePath string) error {
 					if err != nil {
 						return err
 					}
-					defer localFile.Close()
+					defer func() {
+						_ = localFile.Close()
+					}()
 
 					// copy
 					_, err = io.Copy(remoteFile, localFile)
@@ -209,8 +217,8 @@ func (s *scpClient) CopyLocalDir2Remote(localDirPath, remotePath string) error {
 						return err
 					}
 
-					remoteFile.Close()
-					localFile.Close()
+					_ = remoteFile.Close()
+					_ = localFile.Close()
 
 				}
 			} else {
@@ -278,7 +286,9 @@ func (s *scpClient) CopyRemote2Local(remotePath, localPath string) error {
 	if err != nil {
 		return err
 	}
-	defer remoteFile.Close()
+	defer func() {
+		_ = remoteFile.Close()
+	}()
 
 	// get remote file info
 	remoteFileInfo, err := remoteFile.Stat()
@@ -340,8 +350,8 @@ func (s *scpClient) CopyRemote2Local(remotePath, localPath string) error {
 				if err != nil {
 					return err
 				}
-				localFile.Close()
-				remoteTmpFile.Close()
+				_ = localFile.Close()
+				_ = remoteTmpFile.Close()
 			}
 		}
 
@@ -354,7 +364,9 @@ func (s *scpClient) CopyRemote2Local(remotePath, localPath string) error {
 				if err != nil {
 					return err
 				}
-				defer localFile.Close()
+				defer func() {
+					_ = localFile.Close()
+				}()
 
 				// copy remote file to local file
 				_, err = io.Copy(localFile, remoteFile)
@@ -382,7 +394,9 @@ func (s *scpClient) CopyRemote2Local(remotePath, localPath string) error {
 			if err != nil {
 				return err
 			}
-			defer localFile.Close()
+			defer func() {
+				_ = localFile.Close()
+			}()
 			_, err = io.Copy(localFile, remoteFile)
 			if err != nil {
 				return err
