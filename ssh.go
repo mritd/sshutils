@@ -258,9 +258,9 @@ func (s *sshSession) PipeExec(cmd string) {
 func NewSSHSession(session *ssh.Session) *sshSession {
 	return &sshSession{
 		session:     session,
-		errCh:       make(chan error),
-		readyCh:     make(chan int),
-		doneCh:      make(chan int),
-		shellDoneCh: make(chan int),
+		errCh:       make(chan error, 1),
+		readyCh:     make(chan int, 1),
+		doneCh:      make(chan int, 1),
+		shellDoneCh: make(chan int, 1),
 	}
 }
