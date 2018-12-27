@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"time"
 
 	"github.com/mritd/sshutils"
 
@@ -48,7 +49,7 @@ func main() {
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	client, err := ssh.Dial("tcp", "192.168.1.20:22", sshConfig)
+	client, err := ssh.Dial("tcp", "mritd.node:22", sshConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -57,7 +58,8 @@ func main() {
 		panic(err)
 	}
 
-	err = sshutils.NewSSHSession(session).Terminal()
+	err = sshutils.NewSSHSession(session).TerminalWithKeepAlive(10 * time.Second)
+	//err = sshutils.NewSSHSession(session).Terminal()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

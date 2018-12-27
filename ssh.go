@@ -127,6 +127,10 @@ func (s *sshSession) ShellDone() <-chan int {
 }
 
 func (s *sshSession) Terminal() error {
+	return s.TerminalWithKeepAlive(0)
+}
+
+func (s *sshSession) TerminalWithKeepAlive(serverAliveInterval time.Duration) error {
 
 	defer func() {
 		if s.exitMsg == "" {
@@ -196,6 +200,21 @@ func (s *sshSession) Terminal() error {
 			}
 		}
 	}()
+
+	if serverAliveInterval > 0 {
+		go func() {
+			for {
+				select {
+				case <-time.Tick(serverAliveInterval):
+					_, err := s.session.SendRequest("keepalive@mmh", true, nil)
+					if err != nil {
+						fmt.Println(err)
+					}
+				}
+			}
+
+		}()
+	}
 
 	err = s.session.Shell()
 	if err != nil {
