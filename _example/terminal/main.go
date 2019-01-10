@@ -59,7 +59,7 @@ func main() {
 	}
 
 	// auto switch root user
-	err = sshutils.NewSSHSessionWithRoot(session, "password").TerminalWithKeepAlive(10 * time.Second)
+	err = sshutils.NewSSHSessionWithRoot(session, true, "passwd", "passwd").TerminalWithKeepAlive(10 * time.Second)
 	//err = sshutils.NewSSHSession(session).Terminal()
 	if err != nil {
 		fmt.Println(err)
