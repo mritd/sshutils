@@ -29,7 +29,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-type sshSession struct {
+type SSHSession struct {
 	// ssh session
 	session *ssh.Session
 	// error channel return the error when command exec failed
@@ -58,20 +58,20 @@ type sshSession struct {
 	Stderr   io.Reader
 }
 
-func (s *sshSession) Error() <-chan error {
+func (s *SSHSession) Error() <-chan error {
 	return s.errCh
 }
 
-func (s *sshSession) Ready() <-chan int {
+func (s *SSHSession) Ready() <-chan int {
 	return s.readyCh
 }
 
-func (s *sshSession) Done() <-chan int {
+func (s *SSHSession) Done() <-chan int {
 	return s.doneCh
 }
 
 // close the session
-func (s *sshSession) Close() error {
+func (s *SSHSession) Close() error {
 
 	var err error
 	pw, ok := s.session.Stdout.(*io.PipeWriter)
@@ -98,7 +98,7 @@ func (s *sshSession) Close() error {
 }
 
 // update shell terminal size in background
-func (s *sshSession) updateTerminalSize() {
+func (s *SSHSession) updateTerminalSize() {
 
 	go func() {
 		// SIGWINCH is sent to the process when the window size of the terminal has
@@ -141,17 +141,17 @@ func (s *sshSession) updateTerminalSize() {
 
 }
 
-func (s *sshSession) ShellDone() <-chan int {
+func (s *SSHSession) ShellDone() <-chan int {
 	return s.shellDoneCh
 }
 
 // open a interactive shell
-func (s *sshSession) Terminal() error {
+func (s *SSHSession) Terminal() error {
 	return s.TerminalWithKeepAlive(0)
 }
 
 // open a interactive shell with keepalive
-func (s *sshSession) TerminalWithKeepAlive(serverAliveInterval time.Duration) error {
+func (s *SSHSession) TerminalWithKeepAlive(serverAliveInterval time.Duration) error {
 
 	defer func() {
 		if s.exitMsg == "" {
@@ -314,7 +314,7 @@ func (s *sshSession) TerminalWithKeepAlive(serverAliveInterval time.Duration) er
 }
 
 // pipe exec
-func (s *sshSession) PipeExec(cmd string) {
+func (s *SSHSession) PipeExec(cmd string) {
 
 	defer func() {
 		s.doneCh <- 1
@@ -361,8 +361,8 @@ func (s *sshSession) PipeExec(cmd string) {
 }
 
 // New Session
-func NewSSHSession(session *ssh.Session) *sshSession {
-	return &sshSession{
+func NewSSHSession(session *ssh.Session) *SSHSession {
+	return &SSHSession{
 		session:     session,
 		errCh:       make(chan error, 1),
 		readyCh:     make(chan int, 1),
@@ -372,19 +372,19 @@ func NewSSHSession(session *ssh.Session) *sshSession {
 }
 
 // New Session and auto switch root user
-func NewSSHSessionWithRoot(session *ssh.Session, useSudo bool, rootPassword, userPassword string) *sshSession {
+func NewSSHSessionWithRoot(session *ssh.Session, useSudo bool, rootPassword, userPassword string) *SSHSession {
 	return NewSSHSessionWithRootAndCmdDelay(session, useSudo, rootPassword, userPassword, time.Second/10)
 }
 
 // New Session and auto switch root user(support custom switch cmd delay)
-func NewSSHSessionWithRootAndCmdDelay(session *ssh.Session, useSudo bool, rootPassword, userPassword string, cmdDelay time.Duration) *sshSession {
+func NewSSHSessionWithRootAndCmdDelay(session *ssh.Session, useSudo bool, rootPassword, userPassword string, cmdDelay time.Duration) *SSHSession {
 
 	// default to 0.1s
 	if cmdDelay < time.Second/10 {
 		cmdDelay = time.Second / 10
 	}
 
-	return &sshSession{
+	return &SSHSession{
 		session:      session,
 		errCh:        make(chan error, 1),
 		readyCh:      make(chan int, 1),
