@@ -42,7 +42,7 @@ func publicKeyFile(file string) ssh.AuthMethod {
 
 func main() {
 	sshConfig := &ssh.ClientConfig{
-		User: "root",
+		User: "mritd",
 		Auth: []ssh.AuthMethod{
 			publicKeyFile("/Users/mritd/.ssh/id_rsa"),
 		},
@@ -58,7 +58,8 @@ func main() {
 		panic(err)
 	}
 
-	err = sshutils.NewSSHSession(session).TerminalWithKeepAlive(10 * time.Second)
+	// auto switch root user
+	err = sshutils.NewSSHSessionWithRoot(session, "password").TerminalWithKeepAlive(10 * time.Second)
 	//err = sshutils.NewSSHSession(session).Terminal()
 	if err != nil {
 		fmt.Println(err)

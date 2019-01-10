@@ -30,15 +30,18 @@ import (
 )
 
 type sshSession struct {
-	session     *ssh.Session
-	errCh       chan error
-	readyCh     chan int
-	doneCh      chan int
-	shellDoneCh chan int
-	exitMsg     string
-	Stdout      io.Reader
-	Stdin       io.Writer
-	Stderr      io.Reader
+	session      *ssh.Session
+	errCh        chan error
+	readyCh      chan int
+	doneCh       chan int
+	shellDoneCh  chan int
+	exitMsg      string
+	suRoot       bool
+	rootPassword string
+	cmdDelay     time.Duration
+	Stdout       io.Reader
+	Stdin        io.Writer
+	Stderr       io.Reader
 }
 
 func (s *sshSession) Error() <-chan error {
@@ -206,7 +209,7 @@ func (s *sshSession) TerminalWithKeepAlive(serverAliveInterval time.Duration) er
 			for {
 				select {
 				case <-time.Tick(serverAliveInterval):
-					_, err := s.session.SendRequest("keepalive@mmh", true, nil)
+					_, err := s.session.SendRequest("keepalive@mritd.me", true, nil)
 					if err != nil {
 						fmt.Println(err)
 					}
@@ -222,6 +225,31 @@ func (s *sshSession) TerminalWithKeepAlive(serverAliveInterval time.Duration) er
 	}
 
 	s.shellDoneCh <- 1
+
+	// auto switch root user
+	if s.rootPassword != "" {
+		go func() {
+			// delayed execution ensures that welcome messages have been printed to the terminal
+			time.Sleep(s.cmdDelay)
+			_, err := s.Stdin.Write([]byte("su - root && exit\n"))
+			if err != nil {
+				panic(err)
+			}
+			// waiting the 'Password:' message have been printed to the terminal
+			time.Sleep(s.cmdDelay)
+			_, err = s.Stdin.Write([]byte(s.rootPassword + "\n"))
+			if err != nil {
+				panic(err)
+			}
+			// waiting switch root user done
+			time.Sleep(s.cmdDelay)
+			// clean stdout cmd info
+			_, err = s.Stdin.Write([]byte(`echo "\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K"` + "\n"))
+			if err != nil {
+				panic(err)
+			}
+		}()
+	}
 
 	err = s.session.Wait()
 	if err != nil {
@@ -281,5 +309,26 @@ func NewSSHSession(session *ssh.Session) *sshSession {
 		readyCh:     make(chan int, 1),
 		doneCh:      make(chan int, 1),
 		shellDoneCh: make(chan int, 1),
+	}
+}
+
+func NewSSHSessionWithRoot(session *ssh.Session, rootPassword string) *sshSession {
+	return NewSSHSessionWithRootAndCmdDelay(session, rootPassword, time.Second/10)
+}
+
+func NewSSHSessionWithRootAndCmdDelay(session *ssh.Session, rootPassword string, cmdDelay time.Duration) *sshSession {
+
+	if cmdDelay < time.Second/10 {
+		cmdDelay = time.Second / 10
+	}
+
+	return &sshSession{
+		session:      session,
+		errCh:        make(chan error, 1),
+		readyCh:      make(chan int, 1),
+		doneCh:       make(chan int, 1),
+		shellDoneCh:  make(chan int, 1),
+		rootPassword: rootPassword,
+		cmdDelay:     cmdDelay,
 	}
 }
