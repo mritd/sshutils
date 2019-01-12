@@ -269,7 +269,7 @@ func (s *SSHSession) TerminalWithKeepAlive(serverAliveInterval time.Duration) er
 				if err != nil {
 					panic(err)
 				}
-				if s.userPassword != "" {
+				if !s.noPasswordSudo {
 					// waiting the 'Password:' message have been printed to the terminal
 					time.Sleep(s.cmdDelay)
 					_, err = s.Stdin.Write([]byte(s.userPassword + "\n"))
@@ -294,9 +294,9 @@ func (s *SSHSession) TerminalWithKeepAlive(serverAliveInterval time.Duration) er
 			time.Sleep(s.cmdDelay)
 			// clean stdout cmd info
 			if s.noPasswordSudo {
-				_, err = s.Stdin.Write([]byte(`echo "\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K"` + "\n"))
+				_, err = s.Stdin.Write([]byte(`echo "\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K"` + "\n"))
 			} else {
-				_, err = s.Stdin.Write([]byte(`echo "\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K"` + "\n"))
+				_, err = s.Stdin.Write([]byte(`echo "\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K"` + "\n"))
 			}
 			if err != nil {
 				panic(err)
