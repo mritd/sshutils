@@ -46,6 +46,8 @@ type SSHSession struct {
 	suRoot bool
 	// if true, use the 'sudo' command to switch root user
 	useSudo bool
+	// not send user password when run `sudo su - root`
+	noPasswordSudo bool
 	// for auto switch root user(use sudo)
 	userPassword string
 	// for auto switch root user
@@ -262,8 +264,6 @@ func (s *SSHSession) TerminalWithKeepAlive(serverAliveInterval time.Duration) er
 			// delayed execution ensures that welcome messages have been printed to the terminal
 			time.Sleep(s.cmdDelay)
 
-			noPasswdSudo := false
-
 			if s.useSudo {
 				_, err := s.Stdin.Write([]byte("sudo su - root && exit\n"))
 				if err != nil {
@@ -276,8 +276,6 @@ func (s *SSHSession) TerminalWithKeepAlive(serverAliveInterval time.Duration) er
 					if err != nil {
 						panic(err)
 					}
-				} else {
-					noPasswdSudo = true
 				}
 			} else {
 				_, err := s.Stdin.Write([]byte("su - root && exit\n"))
@@ -295,7 +293,7 @@ func (s *SSHSession) TerminalWithKeepAlive(serverAliveInterval time.Duration) er
 			// waiting switch root user done
 			time.Sleep(s.cmdDelay)
 			// clean stdout cmd info
-			if noPasswdSudo {
+			if s.noPasswordSudo {
 				_, err = s.Stdin.Write([]byte(`echo "\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K"` + "\n"))
 			} else {
 				_, err = s.Stdin.Write([]byte(`echo "\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K"` + "\n"))
@@ -372,12 +370,12 @@ func NewSSHSession(session *ssh.Session) *SSHSession {
 }
 
 // New Session and auto switch root user
-func NewSSHSessionWithRoot(session *ssh.Session, useSudo bool, rootPassword, userPassword string) *SSHSession {
-	return NewSSHSessionWithRootAndCmdDelay(session, useSudo, rootPassword, userPassword, time.Second/10)
+func NewSSHSessionWithRoot(session *ssh.Session, useSudo, noPasswordSudo bool, rootPassword, userPassword string) *SSHSession {
+	return NewSSHSessionWithRootAndCmdDelay(session, useSudo, noPasswordSudo, rootPassword, userPassword, time.Second/10)
 }
 
 // New Session and auto switch root user(support custom switch cmd delay)
-func NewSSHSessionWithRootAndCmdDelay(session *ssh.Session, useSudo bool, rootPassword, userPassword string, cmdDelay time.Duration) *SSHSession {
+func NewSSHSessionWithRootAndCmdDelay(session *ssh.Session, useSudo, noPasswordSudo bool, rootPassword, userPassword string, cmdDelay time.Duration) *SSHSession {
 
 	// default to 0.1s
 	if cmdDelay < time.Second/10 {
@@ -385,15 +383,16 @@ func NewSSHSessionWithRootAndCmdDelay(session *ssh.Session, useSudo bool, rootPa
 	}
 
 	return &SSHSession{
-		session:      session,
-		errCh:        make(chan error, 1),
-		readyCh:      make(chan int, 1),
-		doneCh:       make(chan int, 1),
-		shellDoneCh:  make(chan int, 1),
-		suRoot:       true,
-		useSudo:      useSudo,
-		userPassword: userPassword,
-		rootPassword: rootPassword,
-		cmdDelay:     cmdDelay,
+		session:        session,
+		errCh:          make(chan error, 1),
+		readyCh:        make(chan int, 1),
+		doneCh:         make(chan int, 1),
+		shellDoneCh:    make(chan int, 1),
+		suRoot:         true,
+		useSudo:        useSudo,
+		noPasswordSudo: noPasswordSudo,
+		userPassword:   userPassword,
+		rootPassword:   rootPassword,
+		cmdDelay:       cmdDelay,
 	}
 }
