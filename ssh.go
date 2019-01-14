@@ -294,9 +294,9 @@ func (s *SSHSession) TerminalWithKeepAlive(serverAliveInterval time.Duration) er
 			time.Sleep(s.cmdDelay)
 			// clean stdout cmd info
 			if s.noPasswordSudo {
-				_, err = s.Stdin.Write([]byte(`echo "\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K"` + "\n"))
+				_, err = s.Stdin.Write([]byte(`echo -e "\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K"` + "\n"))
 			} else {
-				_, err = s.Stdin.Write([]byte(`echo "\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K"` + "\n"))
+				_, err = s.Stdin.Write([]byte(`echo -e "\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K"` + "\n"))
 			}
 			if err != nil {
 				panic(err)
