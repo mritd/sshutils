@@ -1,19 +1,3 @@
-/*
- * Copyright 2018 mritd <mritd1234@gmail.com>
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package main
 
 import (
@@ -43,20 +27,19 @@ func publicKeyFile(file string) ssh.AuthMethod {
 }
 
 func main() {
-
 	// monitor os signal
-	cancelChannel := make(chan os.Signal)
-	signal.Notify(cancelChannel, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	sigs := make(chan os.Signal)
+	signal.Notify(sigs, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	sshConfig := &ssh.ClientConfig{
 		User: "root",
 		Auth: []ssh.AuthMethod{
-			publicKeyFile("/Users/mritd/.ssh/id_rsa"),
+			publicKeyFile("/tmp/id_rsa"),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	client, err := ssh.Dial("tcp", "192.168.1.20:22", sshConfig)
+	client, err := ssh.Dial("tcp", "192.168.2.5:22", sshConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -64,17 +47,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
 	s := sshutils.NewSSHSession(session)
-
-	// exec
-	go s.PipeExec("journalctl -fu docker")
-
-	// print error
 	go func() {
 		select {
-		case err := <-s.Error():
-			fmt.Println(err)
+		case <-sigs:
+			fmt.Println("exit")
+			_ = s.Close()
 		}
 	}()
 
@@ -82,19 +60,12 @@ func main() {
 	go func() {
 		select {
 		case <-s.Ready():
-			io.Copy(os.Stdout, s.Stdout)
+			_, _ = io.Copy(os.Stdout, s.Stdout)
 		}
 	}()
 
-	select {
-	case <-s.Done():
-		fmt.Println("done")
-	case sig := <-cancelChannel:
-		switch sig {
-		case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
-			fmt.Println("exit")
-			s.Close()
-		}
+	err = s.PipeExec("journalctl -fu docker")
+	if err != nil {
+		fmt.Println(err)
 	}
-
 }

@@ -1,19 +1,3 @@
-/*
- * Copyright 2018 mritd <mritd1234@gmail.com>
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package sshutils
 
 import (
@@ -32,12 +16,8 @@ import (
 type SSHSession struct {
 	// ssh session
 	session *ssh.Session
-	// error channel return the error when command exec failed
-	errCh chan error
 	// for PipeExec, this channel will be read when stdin、stdout ready
 	readyCh chan int
-	// for PipeExec, this channel will be read when command exec finished
-	doneCh chan int
 	// for Interactive shell, this channel will be read when shell ready
 	shellDoneCh chan int
 	// shell command exit message
@@ -60,53 +40,36 @@ type SSHSession struct {
 	Stderr   io.Reader
 }
 
-func (s *SSHSession) Error() <-chan error {
-	return s.errCh
-}
-
 func (s *SSHSession) Ready() <-chan int {
 	return s.readyCh
 }
 
-func (s *SSHSession) Done() <-chan int {
-	return s.doneCh
-}
-
 // close the session
 func (s *SSHSession) Close() error {
-
-	var err error
 	pw, ok := s.session.Stdout.(*io.PipeWriter)
 	if ok {
-		err = pw.Close()
+		err := pw.Close()
 		if err != nil {
-			return err
+			fmt.Println(err)
 		}
 	}
 
 	pr, ok := s.session.Stdin.(*io.PipeReader)
 	if ok {
-		err = pr.Close()
+		err := pr.Close()
 		if err != nil {
-			return err
+			fmt.Println(err)
 		}
 	}
-
-	err = s.session.Close()
-	if err != nil {
-		return err
-	}
-	return nil
+	return s.session.Close()
 }
 
 // update shell terminal size in background
 func (s *SSHSession) updateTerminalSize() {
-
 	go func() {
-		// SIGWINCH is sent to the process when the window size of the terminal has
-		// changed.
-		sigwinchCh := make(chan os.Signal, 1)
-		signal.Notify(sigwinchCh, syscall.SIGWINCH)
+		// SIGWINCH is sent to the process when the window size of the terminal has changed.
+		sigs := make(chan os.Signal)
+		signal.Notify(sigs, syscall.SIGWINCH)
 
 		fd := int(os.Stdin.Fd())
 		termWidth, termHeight, err := terminal.GetSize(fd)
@@ -114,33 +77,22 @@ func (s *SSHSession) updateTerminalSize() {
 			fmt.Println(err)
 		}
 
-		for {
-			select {
-			// The client updated the size of the local PTY. This change needs to occur
-			// on the server side PTY as well.
-			case sigwinch := <-sigwinchCh:
-				if sigwinch == nil {
-					return
-				}
-				currTermWidth, currTermHeight, err := terminal.GetSize(fd)
-
-				// Terminal size has not changed, don's do anything.
-				if currTermHeight == termHeight && currTermWidth == termWidth {
-					continue
-				}
-
-				err = s.session.WindowChange(currTermHeight, currTermWidth)
-				if err != nil {
-					fmt.Printf("Unable to send window-change reqest: %s.", err)
-					continue
-				}
-
-				termWidth, termHeight = currTermWidth, currTermHeight
-
+		for range sigs {
+			currTermWidth, currTermHeight, err := terminal.GetSize(fd)
+			// Terminal size has not changed, don's do anything.
+			if currTermHeight == termHeight && currTermWidth == termWidth {
+				continue
 			}
+
+			// The client updated the size of the local PTY. This change needs to occur on the server side PTY as well.
+			err = s.session.WindowChange(currTermHeight, currTermWidth)
+			if err != nil {
+				fmt.Printf("Unable to send window-change reqest: %s", err)
+				continue
+			}
+			termWidth, termHeight = currTermWidth, currTermHeight
 		}
 	}()
-
 }
 
 func (s *SSHSession) ShellDone() <-chan int {
@@ -154,7 +106,6 @@ func (s *SSHSession) Terminal() error {
 
 // open a interactive shell with keepalive
 func (s *SSHSession) TerminalWithKeepAlive(serverAliveInterval time.Duration) error {
-
 	defer func() {
 		if s.exitMsg == "" {
 			_, _ = fmt.Fprintln(os.Stdout, "the connection was closed on the remote side on ", time.Now().Format(time.RFC822))
@@ -237,16 +188,13 @@ func (s *SSHSession) TerminalWithKeepAlive(serverAliveInterval time.Duration) er
 	// keepalive
 	if serverAliveInterval > 0 {
 		go func() {
-			for {
-				select {
-				case <-time.Tick(serverAliveInterval):
-					_, err := s.session.SendRequest("keepalive@mritd.me", true, nil)
-					if err != nil {
-						fmt.Println(err)
-					}
+			tick := time.Tick(serverAliveInterval)
+			for range tick {
+				_, err := s.session.SendRequest("keepalive@linux.com", true, nil)
+				if err != nil {
+					fmt.Println(err)
 				}
 			}
-
 		}()
 	}
 
@@ -255,7 +203,6 @@ func (s *SSHSession) TerminalWithKeepAlive(serverAliveInterval time.Duration) er
 	if err != nil {
 		return err
 	}
-
 	s.shellDoneCh <- 1
 
 	// auto switch root user
@@ -263,7 +210,6 @@ func (s *SSHSession) TerminalWithKeepAlive(serverAliveInterval time.Duration) er
 		go func() {
 			// delayed execution ensures that welcome messages have been printed to the terminal
 			time.Sleep(s.cmdDelay)
-
 			if s.useSudo {
 				_, err := s.Stdin.Write([]byte("sudo su - root && exit\n"))
 				if err != nil {
@@ -303,27 +249,15 @@ func (s *SSHSession) TerminalWithKeepAlive(serverAliveInterval time.Duration) er
 			}
 		}()
 	}
-
-	err = s.session.Wait()
-	if err != nil {
-		return err
-	}
-	return nil
+	return s.session.Wait()
 }
 
 // pipe exec
-func (s *SSHSession) PipeExec(cmd string) {
-
-	defer func() {
-		s.doneCh <- 1
-		close(s.errCh)
-	}()
-
+func (s *SSHSession) PipeExec(cmd string) error {
 	fd := int(os.Stdin.Fd())
 	termWidth, termHeight, err := terminal.GetSize(fd)
 	if err != nil {
-		s.errCh <- err
-		return
+		return err
 	}
 
 	// default to xterm-256color
@@ -335,12 +269,19 @@ func (s *SSHSession) PipeExec(cmd string) {
 	// request pty
 	err = s.session.RequestPty(termType, termHeight, termWidth, ssh.TerminalModes{})
 	if err != nil {
-		s.errCh <- err
-		return
+		return err
 	}
+
+	// update shell terminal size in background
+	s.updateTerminalSize()
 
 	// write to pw
 	pr, pw := io.Pipe()
+	defer func() {
+		_ = pw.Close()
+		_ = pr.Close()
+	}()
+
 	s.session.Stdout = pw
 	s.session.Stderr = pw
 	s.Stdout = pr
@@ -348,23 +289,14 @@ func (s *SSHSession) PipeExec(cmd string) {
 
 	s.readyCh <- 1
 
-	defer func() {
-		_ = pw.Close()
-	}()
-	err = s.session.Run(cmd)
-	if err != nil {
-		s.errCh <- err
-	}
-
+	return s.session.Run(cmd)
 }
 
 // New Session
 func NewSSHSession(session *ssh.Session) *SSHSession {
 	return &SSHSession{
 		session:     session,
-		errCh:       make(chan error, 1),
 		readyCh:     make(chan int, 1),
-		doneCh:      make(chan int, 1),
 		shellDoneCh: make(chan int, 1),
 	}
 }
@@ -384,9 +316,7 @@ func NewSSHSessionWithRootAndCmdDelay(session *ssh.Session, useSudo, noPasswordS
 
 	return &SSHSession{
 		session:        session,
-		errCh:          make(chan error, 1),
 		readyCh:        make(chan int, 1),
-		doneCh:         make(chan int, 1),
 		shellDoneCh:    make(chan int, 1),
 		suRoot:         true,
 		useSudo:        useSudo,
